@@ -1,13 +1,603 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pickleball RRA</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GoGreenVue — Make Dreams Possible</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green-deep: #0d2b1a;
+      --green-mid: #1a4a2e;
+      --green-bright: #2d7a4a;
+      --green-light: #4aaa6a;
+      --green-pale: #c8e6d0;
+      --green-mist: #e8f5ec;
+      --gold: #c9a84c;
+      --gold-light: #e8c97a;
+      --white: #f7f9f7;
+      --text: #0d2b1a;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--white);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 48px;
+      mix-blend-mode: normal;
+      transition: background 0.4s, padding 0.4s;
+    }
+    nav.scrolled {
+      background: rgba(13, 43, 26, 0.95);
+      backdrop-filter: blur(12px);
+      padding: 16px 48px;
+    }
+    .nav-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--white);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-decoration: none;
+    }
+    .nav-links {
+      display: flex;
+      gap: 36px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: rgba(247, 249, 247, 0.8);
+      text-decoration: none;
+      font-size: 13px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--gold-light); }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: var(--green-deep);
+    }
+
+    /* Layered background */
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 50%, rgba(45, 122, 74, 0.3) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 30%, rgba(26, 74, 46, 0.5) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 60% 80%, rgba(201, 168, 76, 0.1) 0%, transparent 50%),
+        linear-gradient(160deg, #0a1f12 0%, #0d2b1a 40%, #122b1d 100%);
+    }
+
+    /* Floating leaves */
+    .leaves {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .leaf {
+      position: absolute;
+      opacity: 0.06;
+      animation: float linear infinite;
+    }
+    .leaf svg { fill: var(--green-light); }
+
+    @keyframes float {
+      0% { transform: translateY(110vh) rotate(0deg); opacity: 0; }
+      10% { opacity: 0.06; }
+      90% { opacity: 0.06; }
+      100% { transform: translateY(-10vh) rotate(360deg); opacity: 0; }
+    }
+
+    /* Grid texture overlay */
+    .hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(200, 230, 208, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(200, 230, 208, 0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      padding: 0 24px;
+      max-width: 900px;
+    }
+
+    .hero-eyebrow {
+      font-size: 11px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--gold);
+      font-weight: 500;
+      margin-bottom: 28px;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.3s forwards;
+    }
+
+    .hero-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(56px, 9vw, 110px);
+      font-weight: 300;
+      line-height: 1.0;
+      color: var(--white);
+      letter-spacing: -1px;
+      margin-bottom: 12px;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.5s forwards;
+    }
+
+    .hero-title em {
+      font-style: italic;
+      color: var(--green-pale);
+    }
+
+    .hero-subtitle {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(28px, 4vw, 48px);
+      font-weight: 300;
+      font-style: italic;
+      color: var(--gold-light);
+      margin-bottom: 40px;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.7s forwards;
+    }
+
+    .hero-desc {
+      font-size: 16px;
+      color: rgba(200, 230, 208, 0.7);
+      line-height: 1.8;
+      max-width: 480px;
+      margin: 0 auto 52px;
+      font-weight: 300;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.9s forwards;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 1.1s forwards;
+    }
+
+    .btn-primary {
+      background: var(--gold);
+      color: var(--green-deep);
+      padding: 16px 40px;
+      border-radius: 2px;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: background 0.2s, transform 0.2s;
+      display: inline-block;
+    }
+    .btn-primary:hover {
+      background: var(--gold-light);
+      transform: translateY(-2px);
+    }
+
+    .btn-outline {
+      border: 1px solid rgba(200, 230, 208, 0.4);
+      color: var(--green-pale);
+      padding: 16px 40px;
+      border-radius: 2px;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: border-color 0.2s, color 0.2s, transform 0.2s;
+      display: inline-block;
+    }
+    .btn-outline:hover {
+      border-color: var(--gold);
+      color: var(--gold-light);
+      transform: translateY(-2px);
+    }
+
+    /* Scroll indicator */
+    .scroll-hint {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      color: rgba(200, 230, 208, 0.4);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      animation: fadeUp 1s ease 1.5s both;
+    }
+    .scroll-line {
+      width: 1px;
+      height: 48px;
+      background: linear-gradient(to bottom, rgba(200, 230, 208, 0.4), transparent);
+      animation: scrollPulse 2s ease-in-out infinite;
+    }
+    @keyframes scrollPulse {
+      0%, 100% { opacity: 0.4; transform: scaleY(1); }
+      50% { opacity: 1; transform: scaleY(1.2); }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── MARQUEE ── */
+    .marquee-section {
+      background: var(--green-mid);
+      padding: 20px 0;
+      overflow: hidden;
+      border-top: 1px solid rgba(74, 170, 106, 0.2);
+      border-bottom: 1px solid rgba(74, 170, 106, 0.2);
+    }
+    .marquee-track {
+      display: flex;
+      gap: 0;
+      animation: marquee 30s linear infinite;
+      width: max-content;
+    }
+    .marquee-item {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 0 40px;
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(200, 230, 208, 0.6);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .marquee-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--gold);
+      flex-shrink: 0;
+    }
+    @keyframes marquee {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+
+    /* ── FEATURES ── */
+    .features {
+      padding: 120px 48px;
+      background: var(--white);
+    }
+    .section-header {
+      text-align: center;
+      margin-bottom: 80px;
+    }
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--green-bright);
+      font-weight: 500;
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(36px, 5vw, 58px);
+      font-weight: 300;
+      color: var(--green-deep);
+      line-height: 1.1;
+    }
+    .section-title em {
+      font-style: italic;
+      color: var(--green-bright);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 2px;
+      max-width: 1100px;
+      margin: 0 auto;
+      background: var(--green-pale);
+    }
+    .feature-card {
+      background: var(--white);
+      padding: 52px 40px;
+      transition: background 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 0; height: 3px;
+      background: var(--gold);
+      transition: width 0.4s ease;
+    }
+    .feature-card:hover { background: var(--green-mist); }
+    .feature-card:hover::before { width: 100%; }
+
+    .feature-num {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 64px;
+      font-weight: 300;
+      color: var(--green-pale);
+      line-height: 1;
+      margin-bottom: 24px;
+      transition: color 0.3s;
+    }
+    .feature-card:hover .feature-num { color: var(--green-bright); opacity: 0.3; }
+
+    .feature-icon {
+      font-size: 32px;
+      margin-bottom: 20px;
+    }
+    .feature-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--green-deep);
+      margin-bottom: 14px;
+    }
+    .feature-desc {
+      font-size: 14px;
+      color: #5a7a65;
+      line-height: 1.8;
+      font-weight: 300;
+    }
+
+    /* ── PICKLEBALL CTA ── */
+    .pickleball-section {
+      background: var(--green-deep);
+      padding: 100px 48px;
+      position: relative;
+      overflow: hidden;
+    }
+    .pickleball-section::before {
+      content: '🥒';
+      position: absolute;
+      font-size: 300px;
+      right: -40px;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0.05;
+      pointer-events: none;
+    }
+    .pickleball-inner {
+      max-width: 700px;
+      position: relative;
+      z-index: 1;
+    }
+    .pickleball-label {
+      font-size: 10px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 24px;
+    }
+    .pickleball-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(36px, 5vw, 60px);
+      font-weight: 300;
+      color: var(--white);
+      line-height: 1.1;
+      margin-bottom: 24px;
+    }
+    .pickleball-desc {
+      font-size: 15px;
+      color: rgba(200, 230, 208, 0.7);
+      line-height: 1.8;
+      margin-bottom: 40px;
+      font-weight: 300;
+      max-width: 480px;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      background: #070f0a;
+      padding: 60px 48px 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      border-top: 1px solid rgba(74, 170, 106, 0.1);
+    }
+    .footer-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 28px;
+      font-weight: 300;
+      color: var(--white);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+    }
+    .footer-tagline {
+      font-size: 12px;
+      color: rgba(200, 230, 208, 0.4);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .footer-divider {
+      width: 60px;
+      height: 1px;
+      background: var(--gold);
+      opacity: 0.4;
+    }
+    .footer-copy {
+      font-size: 11px;
+      color: rgba(200, 230, 208, 0.3);
+      letter-spacing: 1px;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      nav { padding: 20px 24px; }
+      nav.scrolled { padding: 14px 24px; }
+      .nav-links { display: none; }
+      .features { padding: 80px 24px; }
+      .pickleball-section { padding: 80px 24px; }
+      footer { padding: 48px 24px 32px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav id="navbar">
+    <a href="/" class="nav-logo">GoGreenVue</a>
+    <ul class="nav-links">
+      <li><a href="#about">About</a></li>
+      <li><a href="#features">Vision</a></li>
+      <li><a href="/pickleball">🏓 Pickleball</a></li>
+    </ul>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-grid"></div>
+
+    <!-- Floating leaves -->
+    <div class="leaves">
+      <div class="leaf" style="left:10%;animation-duration:18s;animation-delay:0s;font-size:40px;">
+        <svg viewBox="0 0 100 100" width="40" height="40"><ellipse cx="50" cy="50" rx="20" ry="45" transform="rotate(30 50 50)"/></svg>
+      </div>
+      <div class="leaf" style="left:25%;animation-duration:22s;animation-delay:4s;font-size:30px;">
+        <svg viewBox="0 0 100 100" width="30" height="30"><ellipse cx="50" cy="50" rx="18" ry="40" transform="rotate(-20 50 50)"/></svg>
+      </div>
+      <div class="leaf" style="left:50%;animation-duration:16s;animation-delay:8s;">
+        <svg viewBox="0 0 100 100" width="50" height="50"><ellipse cx="50" cy="50" rx="22" ry="48" transform="rotate(10 50 50)"/></svg>
+      </div>
+      <div class="leaf" style="left:70%;animation-duration:20s;animation-delay:2s;">
+        <svg viewBox="0 0 100 100" width="35" height="35"><ellipse cx="50" cy="50" rx="16" ry="42" transform="rotate(-40 50 50)"/></svg>
+      </div>
+      <div class="leaf" style="left:85%;animation-duration:25s;animation-delay:6s;">
+        <svg viewBox="0 0 100 100" width="28" height="28"><ellipse cx="50" cy="50" rx="20" ry="44" transform="rotate(55 50 50)"/></svg>
+      </div>
+    </div>
+
+    <div class="hero-content">
+      <p class="hero-eyebrow">Welcome to GoGreenVue</p>
+      <h1 class="hero-title">Make <em>Dreams</em><br>Possible</h1>
+      <p class="hero-subtitle">One step at a time.</p>
+      <p class="hero-desc">A space where ideas grow, communities connect, and every vision finds its path forward.</p>
+      <div class="hero-cta">
+        <a href="#about" class="btn-primary">Explore</a>
+        <a href="/pickleball" class="btn-outline">🏓 Pickleball App</a>
+      </div>
+    </div>
+
+    <div class="scroll-hint">
+      <div class="scroll-line"></div>
+      <span>Scroll</span>
+    </div>
+  </section>
+
+  <!-- MARQUEE -->
+  <div class="marquee-section">
+    <div class="marquee-track">
+      <div class="marquee-item"><span>Make Dreams Possible</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>GoGreenVue</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>Grow Together</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>One Step at a Time</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>Dream Big</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>GoGreenVue</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>Make Dreams Possible</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>GoGreenVue</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>Grow Together</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>One Step at a Time</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>Dream Big</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>GoGreenVue</span><div class="marquee-dot"></div></div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section class="features" id="about">
+    <div class="section-header">
+      <p class="section-label">Our Vision</p>
+      <h2 class="section-title">A place where<br><em>everything begins</em></h2>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-num">01</div>
+        <div class="feature-icon">🌱</div>
+        <h3 class="feature-title">Grow</h3>
+        <p class="feature-desc">Every great journey starts with a single seed. We believe in nurturing ideas from the ground up, giving them the space and support to flourish.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-num">02</div>
+        <div class="feature-icon">🤝</div>
+        <h3 class="feature-title">Connect</h3>
+        <p class="feature-desc">Dreams are built together. We bring people, tools, and opportunities into one space to create something greater than the sum of its parts.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-num">03</div>
+        <div class="feature-icon">✨</div>
+        <h3 class="feature-title">Achieve</h3>
+        <p class="feature-desc">From vision to reality — we provide the tools and community to turn what seems impossible into something you can touch, see, and share.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PICKLEBALL CTA -->
+  <section class="pickleball-section" id="features">
+    <div class="pickleball-inner">
+      <p class="pickleball-label">Community · Sport · Fun</p>
+      <h2 class="pickleball-title">Play Pickleball<br>with your community</h2>
+      <p class="pickleball-desc">Organize round-robin tournaments effortlessly. Manage players, courts, scores, and leaderboards — all in one place.</p>
+      <a href="/pickleball" class="btn-primary">Launch Pickleball App →</a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-logo">GoGreenVue</div>
+    <div class="footer-tagline">Make Dreams Possible</div>
+    <div class="footer-divider"></div>
+    <div class="footer-copy">© 2026 GoGreenVue · gogreenvue.com</div>
+  </footer>
+
+  <script>
+    // Navbar scroll effect
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 60);
+    });
+  </script>
+</body>
 </html>
