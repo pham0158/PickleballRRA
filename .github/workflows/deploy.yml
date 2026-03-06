@@ -22,9 +22,9 @@ jobs:
         run: |
           npm install
           npm run build
-          mkdir -p deploy
-          cp index.html deploy/index.html
-          cp -r dist deploy/pickleball
+          mkdir -p deploy/pickleball
+          cp -r dist/. deploy/pickleball/
+          cp homepage.html deploy/index.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
