@@ -4,8 +4,8 @@ import { getFirestore, doc, setDoc, collection, deleteDoc, onSnapshot } from "fi
 
 // EmailJS config
 const EMAILJS_SERVICE_ID  = "service_5tdfzpt";
-const EMAILJS_TEMPLATE_ID = "template_mxauaq9";
-const EMAILJS_PUBLIC_KEY  = "YOUR_PUBLIC_KEY"; // ← paste from EmailJS Account page
+const EMAILJS_TEMPLATE_ID = "template_dtkmdlr";
+const EMAILJS_PUBLIC_KEY  = "HAsGlq5KZDk4pD8fz"; // ← paste from EmailJS Account page
 const FEEDBACK_EMAIL      = "gogreenvue@gmail.com";
 
 async function sendFeedbackEmail(params: {
