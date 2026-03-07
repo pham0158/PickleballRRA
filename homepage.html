@@ -473,6 +473,51 @@
       .pickleball-section { padding: 80px 24px; }
       footer { padding: 48px 24px 32px; }
     }
+
+    /* ── Colorblind modes ── */
+    body.deuteranopia {
+      --green-deep: #001133;
+      --green-mid: #0077bb;
+      --green-bright: #0077bb;
+      --green-light: #33bbee;
+      --gold: #ee7733;
+      --gold-light: #ffcc99;
+    }
+    body.highcontrast {
+      --green-deep: #000000;
+      --green-mid: #005fcc;
+      --green-bright: #005fcc;
+      --green-light: #ffffff;
+      --gold: #ffcc00;
+      --gold-light: #ffee88;
+    }
+    body.highcontrast .hero, body.highcontrast .pickleball-section,
+    body.highcontrast .features-section { background: #000 !important; }
+    body.highcontrast nav { background: #000 !important; border-bottom: 2px solid #fff; }
+    body.highcontrast .btn-primary { background: #ffcc00 !important; color: #000 !important; font-weight: 900 !important; }
+    body.highcontrast .btn-outline { border-width: 2px !important; font-weight: 700 !important; }
+
+    /* ── Accessibility floating button ── */
+    #a11y-btn {
+      position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+      background: rgba(255,255,255,0.15); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.3); border-radius: 50px;
+      color: #fff; padding: 10px 16px; cursor: pointer;
+      font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px;
+      transition: background .2s; box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    }
+    #a11y-btn:hover { background: rgba(255,255,255,0.28); }
+    #a11y-menu {
+      position: fixed; bottom: 68px; right: 20px; z-index: 9999;
+      background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+      overflow: hidden; min-width: 230px; display: none;
+    }
+    #a11y-menu.open { display: block; }
+    .a11y-header { padding: 10px 16px 6px; font-size: 10px; font-weight: 700; color: #aaa; letter-spacing: 2px; border-bottom: 1px solid #eee; }
+    .a11y-opt { display: block; width: 100%; text-align: left; padding: 11px 16px; border: none; background: #fff; cursor: pointer; font-size: 14px; border-left: 3px solid transparent; }
+    .a11y-opt:hover { background: #f5f5f5; }
+    .a11y-opt.active { background: #e8f5e8; border-left-color: #2d6a2d; font-weight: 700; color: #2d6a2d; }
+    .a11y-opt small { display: block; font-size: 11px; color: #aaa; margin-top: 2px; font-weight: 400; }
   </style>
 </head>
 <body>
@@ -628,12 +673,64 @@
     <div class="footer-copy">© 2026 GoGreenVue · gogreenvue.com</div>
   </footer>
 
+  <!-- Accessibility floating button -->
+  <button id="a11y-btn" onclick="toggleA11yMenu()">👁 Accessibility</button>
+  <div id="a11y-menu">
+    <div class="a11y-header">COLOR MODE</div>
+    <button class="a11y-opt active" id="opt-normal" onclick="setA11y('normal')">
+      🎨 Normal<small>Default colors</small>
+    </button>
+    <button class="a11y-opt" id="opt-deuteranopia" onclick="setA11y('deuteranopia')">
+      👁 Deuteranopia<small>Red-green colorblind friendly</small>
+    </button>
+    <button class="a11y-opt" id="opt-highcontrast" onclick="setA11y('highcontrast')">
+      ⚡ High Contrast<small>Maximum readability</small>
+    </button>
+  </div>
+
   <script>
     // Navbar scroll effect
     const navbar = document.getElementById('navbar');
     window.addEventListener('scroll', () => {
       navbar.classList.toggle('scrolled', window.scrollY > 60);
     });
+
+    // Accessibility / color mode
+    const A11Y_KEY = 'ggv_color_mode';
+    const MODES = ['normal','deuteranopia','highcontrast'];
+    const ICONS = { normal:'🎨', deuteranopia:'👁', highcontrast:'⚡' };
+
+    function applyA11y(mode) {
+      document.body.classList.remove(...MODES);
+      if (mode !== 'normal') document.body.classList.add(mode);
+      document.querySelectorAll('.a11y-opt').forEach(b => b.classList.remove('active'));
+      const opt = document.getElementById('opt-' + mode);
+      if (opt) opt.classList.add('active');
+      document.getElementById('a11y-btn').innerHTML = ICONS[mode] + ' Accessibility';
+      try { localStorage.setItem(A11Y_KEY, mode); } catch(e) {}
+    }
+
+    function setA11y(mode) {
+      applyA11y(mode);
+      document.getElementById('a11y-menu').classList.remove('open');
+    }
+
+    function toggleA11yMenu() {
+      document.getElementById('a11y-menu').classList.toggle('open');
+    }
+
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#a11y-btn') && !e.target.closest('#a11y-menu')) {
+        document.getElementById('a11y-menu').classList.remove('open');
+      }
+    });
+
+    // Restore saved preference
+    try {
+      const saved = localStorage.getItem(A11Y_KEY);
+      if (saved && MODES.includes(saved)) applyA11y(saved);
+    } catch(e) {}
   </script>
 </body>
 </html>

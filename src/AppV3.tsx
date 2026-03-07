@@ -5,7 +5,7 @@ import { getFirestore, doc, setDoc, collection, deleteDoc, onSnapshot } from "fi
 // EmailJS config
 const EMAILJS_SERVICE_ID  = "service_5tdfzpt";
 const EMAILJS_TEMPLATE_ID = "template_dtkmdlr";
-const EMAILJS_PUBLIC_KEY  = "HAsGlq5KZDk4pD8fz"; // ← paste from EmailJS Account page
+const EMAILJS_PUBLIC_KEY  = "HAsGlq5KZDk4pD8fz";
 const FEEDBACK_EMAIL      = "gogreenvue@gmail.com";
 
 async function sendFeedbackEmail(params: {
@@ -76,33 +76,31 @@ function getGroupColors(mode: ColorMode) {
   return GROUP_COLORS_NORMAL;
 }
 
-// Base theme — overridden per mode
-const C_NORMAL = {
-  green: "#2d6a2d", greenMid: "#4a9e4a", greenLight: "#e8f5e8",
-  yellow: "#f5c518", yellowLight: "#fffbe6", dark: "#1a3a1a",
-  gray: "#f0f0f0", grayMid: "#ccc", red: "#c0392b",
-  blue: "#2980b9", purple: "#8e44ad", orange: "#d35400",
+// Theme palettes
+const THEMES: Record<ColorMode, typeof C_BASE> = {
+  normal: {
+    green: "#2d6a2d", greenMid: "#4a9e4a", greenLight: "#e8f5e8",
+    yellow: "#f5c518", yellowLight: "#fffbe6", dark: "#1a3a1a",
+    gray: "#f0f0f0", grayMid: "#ccc", red: "#c0392b",
+    blue: "#2980b9", purple: "#8e44ad", orange: "#d35400",
+  },
+  deuteranopia: {
+    green: "#0077bb", greenMid: "#33bbee", greenLight: "#e0f4ff",
+    yellow: "#ee7733", yellowLight: "#fff3e0", dark: "#001133",
+    gray: "#f0f0f0", grayMid: "#bbb", red: "#cc3311",
+    blue: "#0077bb", purple: "#aa3377", orange: "#ee7733",
+  },
+  highcontrast: {
+    green: "#005fcc", greenMid: "#0080ff", greenLight: "#e0eeff",
+    yellow: "#ffcc00", yellowLight: "#fff8cc", dark: "#000000",
+    gray: "#e0e0e0", grayMid: "#999", red: "#cc0000",
+    blue: "#005fcc", purple: "#6600aa", orange: "#c45000",
+  },
 };
-const C_DEUTER = {
-  green: "#0077bb", greenMid: "#33bbee", greenLight: "#e0f4ff",
-  yellow: "#ee7733", yellowLight: "#fff3e0", dark: "#001133",
-  gray: "#f0f0f0", grayMid: "#bbb", red: "#cc3311",
-  blue: "#0077bb", purple: "#aa3377", orange: "#ee7733",
-};
-const C_HC = {
-  green: "#005fcc", greenMid: "#0080ff", greenLight: "#e0eeff",
-  yellow: "#ffcc00", yellowLight: "#fff8cc", dark: "#000000",
-  gray: "#e0e0e0", grayMid: "#999", red: "#cc0000",
-  blue: "#005fcc", purple: "#6600aa", orange: "#c45000",
-};
-
-// Global reactive theme — components read from this
-let C = { ...C_NORMAL };
-function applyTheme(mode: ColorMode) {
-  if (mode === "deuteranopia") Object.assign(C, C_DEUTER);
-  else if (mode === "highcontrast") Object.assign(C, C_HC);
-  else Object.assign(C, C_NORMAL);
-}
+// C_BASE type helper (unused at runtime, just for type inference)
+const C_BASE = THEMES.normal;
+// Default C — gets replaced via React state in the App component
+let C = THEMES.normal;
 
 const COLOR_MODE_LABELS: Record<ColorMode, string> = {
   normal:       "🎨 Normal",
@@ -864,22 +862,21 @@ export default function App() {
   const [pwUnlocked, setPwUnlocked] = useState<Record<string,boolean>>({}); 
   const [showFeedback, setShowFeedback] = useState(false);
   const [colorMode, setColorMode] = useState<ColorMode>(()=>{
-    return (localStorage.getItem("pb_color_mode") as ColorMode) || "normal";
+    try { return (localStorage.getItem("pb_color_mode") as ColorMode) || "normal"; }
+    catch { return "normal"; }
   });
   const [showColorMenu, setShowColorMenu] = useState(false);
 
-  // Apply theme on mount + whenever mode changes
-  useEffect(()=>{
-    applyTheme(colorMode);
-    localStorage.setItem("pb_color_mode", colorMode);
-  }, [colorMode]);
+  // Derive theme from colorMode — fully reactive, no mutations
+  const theme = useMemo(()=> THEMES[colorMode] || THEMES.normal, [colorMode]);
+  C = theme; // update module-level C so sub-components pick it up
 
   const GROUP_COLORS = getGroupColors(colorMode);
 
-  const hcStyle = colorMode === "highcontrast" ? {
-    outline: "2px solid #000",
-    fontWeight: 900,
-  } : {};
+  const changeColorMode = (mode: ColorMode) => {
+    setColorMode(mode);
+    try { localStorage.setItem("pb_color_mode", mode); } catch {}
+  };
 
   // Group modal state
   const [showModal, setShowModal] = useState(false);
@@ -1006,11 +1003,16 @@ export default function App() {
     </div>
   );
 
-  // Apply group-level color mode override when viewing a group
-  const effectiveColorMode: ColorMode = (selectedGroup?.colorMode && selectedGroup.colorMode !== "normal")
-    ? selectedGroup.colorMode
-    : colorMode;
-  useEffect(()=>{ applyTheme(effectiveColorMode); }, [effectiveColorMode]);
+  // Apply group-level color mode override — must be BEFORE any early returns (Rules of Hooks)
+  const effectiveColorMode: ColorMode = useMemo(()=>
+    (selectedGroup?.colorMode && selectedGroup.colorMode !== "normal")
+      ? selectedGroup.colorMode
+      : colorMode
+  , [selectedGroup?.colorMode, colorMode]);
+
+  // Sync C to effective theme for group view (safe — no side effects, just assignment)
+  const effectiveTheme = THEMES[effectiveColorMode] || THEMES.normal;
+  C = effectiveTheme;
 
   // ── PASSWORD GATE ──
   if (selectedGroupId && selectedGroup?.isPrivate && !pwUnlocked[selectedGroupId]) {
@@ -1046,7 +1048,7 @@ export default function App() {
               <div style={{ position:"absolute", right:0, top:"calc(100% + 8px)", background:"#fff", borderRadius:10, boxShadow:"0 4px 20px #0003", zIndex:500, minWidth:200, overflow:"hidden" }}>
                 <div style={{ padding:"10px 14px 6px", fontSize:11, fontWeight:700, color:"#aaa", letterSpacing:1 }}>COLOR MODE</div>
                 {(["normal","deuteranopia","highcontrast"] as ColorMode[]).map(mode=>(
-                  <button key={mode} onClick={()=>{ setColorMode(mode); setShowColorMenu(false); }} style={{
+                  <button key={mode} onClick={()=>{ changeColorMode(mode); setShowColorMenu(false); }} style={{
                     display:"block", width:"100%", textAlign:"left", padding:"10px 14px",
                     background: colorMode===mode ? C.greenLight : "#fff",
                     border:"none", cursor:"pointer", fontSize:14,
@@ -1174,7 +1176,7 @@ export default function App() {
               <div style={{ position:"absolute", right:0, top:"calc(100% + 8px)", background:"#fff", borderRadius:10, boxShadow:"0 4px 20px #0003", zIndex:500, minWidth:200, overflow:"hidden" }}>
                 <div style={{ padding:"10px 14px 6px", fontSize:11, fontWeight:700, color:"#aaa", letterSpacing:1 }}>COLOR MODE</div>
                 {(["normal","deuteranopia","highcontrast"] as ColorMode[]).map(mode=>(
-                  <button key={mode} onClick={()=>{ setColorMode(mode); setShowColorMenu(false); }} style={{
+                  <button key={mode} onClick={()=>{ changeColorMode(mode); setShowColorMenu(false); }} style={{
                     display:"block", width:"100%", textAlign:"left", padding:"10px 14px",
                     background: colorMode===mode ? C.greenLight : "#fff",
                     border:"none", cursor:"pointer", fontSize:14,
