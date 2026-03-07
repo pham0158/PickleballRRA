@@ -4,8 +4,8 @@ import { getFirestore, doc, setDoc, collection, deleteDoc, onSnapshot } from "fi
 
 // EmailJS config
 const EMAILJS_SERVICE_ID  = "service_5tdfzpt";
-const EMAILJS_TEMPLATE_ID = "template_mxauaq9";
-const EMAILJS_PUBLIC_KEY  = "YOUR_PUBLIC_KEY"; // ← paste from EmailJS Account page
+const EMAILJS_TEMPLATE_ID = "template_dtkmdlr";
+const EMAILJS_PUBLIC_KEY  = "HAsGlq5KZDk4pD8fz";
 const FEEDBACK_EMAIL      = "gogreenvue@gmail.com";
 
 async function sendFeedbackEmail(params: {
@@ -59,13 +59,53 @@ const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
 const MAX_PLAYERS = 30;
-const GROUP_COLORS = ["#2d6a2d","#2980b9","#8e44ad","#c0392b","#d35400","#16a085","#2c3e50","#b7950b"];
 
-const C = {
-  green: "#2d6a2d", greenMid: "#4a9e4a", greenLight: "#e8f5e8",
-  yellow: "#f5c518", yellowLight: "#fffbe6", dark: "#1a3a1a",
-  gray: "#f0f0f0", grayMid: "#ccc", red: "#c0392b",
-  blue: "#2980b9", purple: "#8e44ad", orange: "#d35400",
+// ── COLOR THEMES ──────────────────────────────────────────────────────────────
+// Normal group colors
+const GROUP_COLORS_NORMAL   = ["#2d6a2d","#2980b9","#8e44ad","#c0392b","#d35400","#16a085","#2c3e50","#b7950b"];
+// Deuteranopia-safe: avoids red/green confusion — uses blue/orange/purple/teal
+const GROUP_COLORS_DEUTER   = ["#0077bb","#ee7733","#aa3377","#009988","#33bbee","#cc3311","#332288","#ee3377"];
+// High contrast: bold, thick, no transparency
+const GROUP_COLORS_HC       = ["#005fcc","#c45000","#6600aa","#007755","#004488","#aa0000","#555500","#880044"];
+
+type ColorMode = "normal" | "deuteranopia" | "highcontrast";
+
+function getGroupColors(mode: ColorMode) {
+  if (mode === "deuteranopia") return GROUP_COLORS_DEUTER;
+  if (mode === "highcontrast") return GROUP_COLORS_HC;
+  return GROUP_COLORS_NORMAL;
+}
+
+// Theme palettes
+const THEMES: Record<ColorMode, typeof C_BASE> = {
+  normal: {
+    green: "#2d6a2d", greenMid: "#4a9e4a", greenLight: "#e8f5e8",
+    yellow: "#f5c518", yellowLight: "#fffbe6", dark: "#1a3a1a",
+    gray: "#f0f0f0", grayMid: "#ccc", red: "#c0392b",
+    blue: "#2980b9", purple: "#8e44ad", orange: "#d35400",
+  },
+  deuteranopia: {
+    green: "#0077bb", greenMid: "#33bbee", greenLight: "#e0f4ff",
+    yellow: "#ee7733", yellowLight: "#fff3e0", dark: "#001133",
+    gray: "#f0f0f0", grayMid: "#bbb", red: "#cc3311",
+    blue: "#0077bb", purple: "#aa3377", orange: "#ee7733",
+  },
+  highcontrast: {
+    green: "#005fcc", greenMid: "#0080ff", greenLight: "#e0eeff",
+    yellow: "#ffcc00", yellowLight: "#fff8cc", dark: "#000000",
+    gray: "#e0e0e0", grayMid: "#999", red: "#cc0000",
+    blue: "#005fcc", purple: "#6600aa", orange: "#c45000",
+  },
+};
+// C_BASE type helper (unused at runtime, just for type inference)
+const C_BASE = THEMES.normal;
+// Default C — gets replaced via React state in the App component
+let C = THEMES.normal;
+
+const COLOR_MODE_LABELS: Record<ColorMode, string> = {
+  normal:       "🎨 Normal",
+  deuteranopia: "👁 Deuteranopia",
+  highcontrast: "⚡ High Contrast",
 };
 
 // Simple hash for password (not cryptographic, just obfuscation for privacy)
@@ -117,6 +157,7 @@ interface Group {
   numCourts: number;
   isPrivate: boolean;
   passwordHash?: string;
+  colorMode?: ColorMode;  // per-group override
   tournament?: TournamentState;
 }
 
@@ -820,6 +861,22 @@ export default function App() {
   const [nameInput, setNameInput] = useState("");
   const [pwUnlocked, setPwUnlocked] = useState<Record<string,boolean>>({}); 
   const [showFeedback, setShowFeedback] = useState(false);
+  const [colorMode, setColorMode] = useState<ColorMode>(()=>{
+    try { return (localStorage.getItem("pb_color_mode") as ColorMode) || "normal"; }
+    catch { return "normal"; }
+  });
+  const [showColorMenu, setShowColorMenu] = useState(false);
+
+  // Derive theme from colorMode — fully reactive, no mutations
+  const theme = useMemo(()=> THEMES[colorMode] || THEMES.normal, [colorMode]);
+  C = theme; // update module-level C so sub-components pick it up
+
+  const GROUP_COLORS = getGroupColors(colorMode);
+
+  const changeColorMode = (mode: ColorMode) => {
+    setColorMode(mode);
+    try { localStorage.setItem("pb_color_mode", mode); } catch {}
+  };
 
   // Group modal state
   const [showModal, setShowModal] = useState(false);
@@ -831,6 +888,7 @@ export default function App() {
   const [mPrivate, setMPrivate] = useState(false);
   const [mPassword, setMPassword] = useState("");
   const [mShowPw, setMShowPw] = useState(false);
+  const [mColorMode, setMColorMode] = useState<ColorMode>("normal");
 
   useEffect(()=>{
     // Restore session unlocks
@@ -861,12 +919,13 @@ export default function App() {
   const openNewGroup = () => {
     setEditingGroup(null);
     setMName(""); setMLocation(""); setMColor(GROUP_COLORS[groups.length%GROUP_COLORS.length]);
-    setMCourts(2); setMPrivate(false); setMPassword("");
+    setMCourts(2); setMPrivate(false); setMPassword(""); setMColorMode("normal");
     setShowModal(true);
   };
   const openEditGroup = (g: Group) => {
     setEditingGroup(g); setMName(g.name); setMLocation(g.location||"");
     setMColor(g.color); setMCourts(g.numCourts); setMPrivate(g.isPrivate||false); setMPassword("");
+    setMColorMode(g.colorMode||"normal");
     setShowModal(true);
   };
   const saveGroup = async () => {
@@ -880,6 +939,7 @@ export default function App() {
     await setDoc(doc(db,"pb3_groups",id), {
       ...base, id, name:mName.trim(), location:mLocation.trim(),
       color:mColor, numCourts:mCourts, isPrivate:mPrivate,
+      colorMode: mColorMode,
       ...(passwordHash ? {passwordHash} : {}),
     });
     if (mPrivate && mPassword.trim()) {
@@ -943,6 +1003,17 @@ export default function App() {
     </div>
   );
 
+  // Apply group-level color mode override — must be BEFORE any early returns (Rules of Hooks)
+  const effectiveColorMode: ColorMode = useMemo(()=>
+    (selectedGroup?.colorMode && selectedGroup.colorMode !== "normal")
+      ? selectedGroup.colorMode
+      : colorMode
+  , [selectedGroup?.colorMode, colorMode]);
+
+  // Sync C to effective theme for group view (safe — no side effects, just assignment)
+  const effectiveTheme = THEMES[effectiveColorMode] || THEMES.normal;
+  C = effectiveTheme;
+
   // ── PASSWORD GATE ──
   if (selectedGroupId && selectedGroup?.isPrivate && !pwUnlocked[selectedGroupId]) {
     return (
@@ -966,6 +1037,32 @@ export default function App() {
               {selectedGroup.isPrivate&&<span style={{ marginLeft:8, fontSize:14 }}>🔒</span>}
             </div>
             {selectedGroup.location&&<div style={{ color:"rgba(255,255,255,0.75)", fontSize:12 }}>📍 {selectedGroup.location}</div>}
+          </div>
+          {/* Color mode picker */}
+          <div style={{ position:"relative" }}>
+            <button onClick={()=>setShowColorMenu(p=>!p)} title="Accessibility / Color mode"
+              style={{ background:"rgba(255,255,255,0.15)", border: colorMode!=="normal"?"2px solid #fff":"none", borderRadius:8, color:"#fff", padding:"6px 10px", cursor:"pointer", fontSize:16 }}>
+              {colorMode==="deuteranopia"?"👁":colorMode==="highcontrast"?"⚡":"🎨"}
+            </button>
+            {showColorMenu&&(
+              <div style={{ position:"absolute", right:0, top:"calc(100% + 8px)", background:"#fff", borderRadius:10, boxShadow:"0 4px 20px #0003", zIndex:500, minWidth:200, overflow:"hidden" }}>
+                <div style={{ padding:"10px 14px 6px", fontSize:11, fontWeight:700, color:"#aaa", letterSpacing:1 }}>COLOR MODE</div>
+                {(["normal","deuteranopia","highcontrast"] as ColorMode[]).map(mode=>(
+                  <button key={mode} onClick={()=>{ changeColorMode(mode); setShowColorMenu(false); }} style={{
+                    display:"block", width:"100%", textAlign:"left", padding:"10px 14px",
+                    background: colorMode===mode ? C.greenLight : "#fff",
+                    border:"none", cursor:"pointer", fontSize:14,
+                    fontWeight: colorMode===mode ? 700 : 400,
+                    color: colorMode===mode ? C.green : "#333",
+                    borderLeft: colorMode===mode ? `3px solid ${C.green}` : "3px solid transparent",
+                  }}>
+                    {COLOR_MODE_LABELS[mode]}
+                    {mode==="deuteranopia"&&<div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>Red-green colorblind friendly</div>}
+                    {mode==="highcontrast"&&<div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>Maximum contrast</div>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <button onClick={()=>setShowFeedback(true)} title="Send feedback" style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:8, color:"#fff", padding:"6px 10px", cursor:"pointer", fontSize:16 }}>💬</button>
           <a href="/" title="Go to homepage" style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:8, color:"#fff", padding:"6px 10px", cursor:"pointer", fontSize:16, textDecoration:"none" }}>🏠</a>
@@ -1059,7 +1156,7 @@ export default function App() {
   // ── MAIN VIEW ──────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight:"100vh", background:C.greenLight, fontFamily:"'Segoe UI',sans-serif" }}>
-      <div style={{ background:C.green, padding:"14px 20px", display:"flex", alignItems:"center", gap:12, boxShadow:"0 2px 8px #0003" }}>
+      <div style={{ background:C.green, padding:"14px 20px", display:"flex", alignItems:"center", gap:12, boxShadow:"0 2px 8px #0003", ...(colorMode==="highcontrast"?{border:"3px solid #fff"}:{}) }}>
         <span style={{ fontSize:28 }}>🥒</span>
         <div>
           <div style={{ color:C.yellow, fontWeight:900, fontSize:20, letterSpacing:1 }}>PICKLEBALL</div>
@@ -1069,6 +1166,32 @@ export default function App() {
           {groups.filter(g=>g.tournament?.started).length>0&&(
             <Badge color={C.orange}>🔴 {groups.filter(g=>g.tournament?.started).length} Live</Badge>
           )}
+          {/* Color mode picker */}
+          <div style={{ position:"relative" }}>
+            <button onClick={()=>setShowColorMenu(p=>!p)} title="Accessibility / Color mode"
+              style={{ background:"rgba(255,255,255,0.15)", border: colorMode!=="normal"?"2px solid #fff":"none", borderRadius:8, color:"#fff", padding:"6px 11px", cursor:"pointer", fontSize:16 }}>
+              {colorMode==="deuteranopia"?"👁":colorMode==="highcontrast"?"⚡":"🎨"}
+            </button>
+            {showColorMenu&&(
+              <div style={{ position:"absolute", right:0, top:"calc(100% + 8px)", background:"#fff", borderRadius:10, boxShadow:"0 4px 20px #0003", zIndex:500, minWidth:200, overflow:"hidden" }}>
+                <div style={{ padding:"10px 14px 6px", fontSize:11, fontWeight:700, color:"#aaa", letterSpacing:1 }}>COLOR MODE</div>
+                {(["normal","deuteranopia","highcontrast"] as ColorMode[]).map(mode=>(
+                  <button key={mode} onClick={()=>{ changeColorMode(mode); setShowColorMenu(false); }} style={{
+                    display:"block", width:"100%", textAlign:"left", padding:"10px 14px",
+                    background: colorMode===mode ? C.greenLight : "#fff",
+                    border:"none", cursor:"pointer", fontSize:14,
+                    fontWeight: colorMode===mode ? 700 : 400,
+                    color: colorMode===mode ? C.green : "#333",
+                    borderLeft: colorMode===mode ? `3px solid ${C.green}` : "3px solid transparent",
+                  }}>
+                    {COLOR_MODE_LABELS[mode]}
+                    {mode==="deuteranopia"&&<div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>Red-green colorblind friendly</div>}
+                    {mode==="highcontrast"&&<div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>Maximum contrast</div>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button onClick={()=>setShowFeedback(true)} title="Send feedback" style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:8, color:"#fff", padding:"6px 11px", cursor:"pointer", fontSize:16 }}>💬</button>
           <a href="/" title="Go to homepage" style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:8, color:"#fff", padding:"6px 11px", cursor:"pointer", fontSize:16, textDecoration:"none" }}>🏠</a>
         </div>
@@ -1125,6 +1248,7 @@ export default function App() {
                   <span style={{ fontSize:13, color:"#555" }}>👥 {g.players.length} players</span>
                   <span style={{ fontSize:13, color:"#555" }}>🏓 {g.numCourts} court(s)</span>
                   {g.isPrivate&&<span style={{ fontSize:12, color:C.purple }}>🔒 Private</span>}
+                  {g.colorMode&&g.colorMode!=="normal"&&<span style={{ fontSize:12, color:C.blue }}>{g.colorMode==="deuteranopia"?"👁 Deuteranopia":"⚡ Hi-Contrast"}</span>}
                   <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
                     <Btn small outline color={g.color} onClick={()=>openEditGroup(g)}>Edit</Btn>
                     <Btn small outline color={C.red} onClick={()=>deleteGroup(g.id)}>Delete</Btn>
@@ -1289,6 +1413,28 @@ export default function App() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Per-group color mode override */}
+            <div style={{ marginBottom:22 }}>
+              <label style={{ fontSize:11, fontWeight:700, color:"#888", letterSpacing:1 }}>ACCESSIBILITY / COLOR MODE</label>
+              <div style={{ display:"flex", gap:8, marginTop:8, flexWrap:"wrap" }}>
+                {(["normal","deuteranopia","highcontrast"] as ColorMode[]).map(mode=>(
+                  <button key={mode} onClick={()=>setMColorMode(mode)} style={{
+                    flex:1, minWidth:100, padding:"8px 10px", borderRadius:8, border:"2px solid",
+                    borderColor: mColorMode===mode ? mColor : C.grayMid,
+                    background: mColorMode===mode ? mColor : "#fff",
+                    color: mColorMode===mode ? "#fff" : "#555",
+                    fontWeight: mColorMode===mode ? 700 : 400,
+                    fontSize:12, cursor:"pointer", transition:"all .15s",
+                  }}>
+                    {mode==="normal"?"🎨 Normal":mode==="deuteranopia"?"👁 Deuteranopia":"⚡ High Contrast"}
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize:11, color:"#aaa", marginTop:6 }}>
+                Overrides global setting for this group only
+              </div>
             </div>
 
             <div style={{ display:"flex", gap:10 }}>
