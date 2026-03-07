@@ -482,9 +482,8 @@
     <a href="/" class="nav-logo">GoGreenVue</a>
     <ul class="nav-links">
       <li><a href="#about">About</a></li>
-      <li><a href="#features">Vision</a></li>
-      <li><a href="/pickleball">🏓 Pickleball</a></li>
-      <li><a href="/pickleball-v2" style="color:var(--gold);">🔥 Pickleball V2</a></li>
+      <li><a href="#features">Releases</a></li>
+      <li><a href="/pickleball-v3" style="color:var(--green-light);">🥒 Pickleball V3</a></li>
     </ul>
   </nav>
 
@@ -519,8 +518,7 @@
       <p class="hero-desc">A space where ideas grow, communities connect, and every vision finds its path forward.</p>
       <div class="hero-cta">
         <a href="#about" class="btn-primary">Explore</a>
-        <a href="/pickleball-v2" class="btn-outline" style="border-color:var(--gold);color:var(--gold-light);">🔥 Pickleball V2 — New!</a>
-        <a href="/pickleball" class="btn-outline">🏓 Pickleball V1</a>
+        <a href="/pickleball-v3" class="btn-outline" style="border-color:var(--green-light);color:var(--green-light);">🥒 Pickleball V3 — Latest</a>
       </div>
     </div>
 
@@ -578,24 +576,100 @@
 
   <!-- PICKLEBALL CTA -->
   <section class="pickleball-section" id="features">
-    <div class="pickleball-inner">
+    <div class="pickleball-inner" style="max-width:900px;">
       <p class="pickleball-label">Community · Sport · Fun</p>
       <h2 class="pickleball-title">Play Pickleball<br>with your community</h2>
       <p class="pickleball-desc">Organize round-robin tournaments effortlessly. Manage players, courts, scores, and leaderboards — all in one place.</p>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;">
-        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(200,230,208,0.15);border-radius:8px;padding:28px;flex:1;min-width:220px;">
-          <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:rgba(200,230,208,0.5);margin-bottom:12px;">Version 1 · Stable</div>
-          <div style="font-family:'Cormorant Garamond',serif;font-size:24px;color:var(--white);margin-bottom:10px;">Classic App</div>
-          <div style="font-size:13px;color:rgba(200,230,208,0.6);line-height:1.7;margin-bottom:24px;">Players, courts, rounds & leaderboard. Simple and reliable.</div>
-          <a href="/pickleball" class="btn-outline" style="font-size:11px;padding:12px 28px;">Launch V1 →</a>
+
+      <!-- Version cards -->
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:56px;">
+
+        <!-- V1 -->
+        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(200,230,208,0.12);border-radius:8px;padding:24px;flex:1;min-width:200px;">
+          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(200,230,208,0.4);margin-bottom:10px;">Version 1 · Stable</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--white);margin-bottom:8px;">Classic</div>
+          <div style="font-size:12px;color:rgba(200,230,208,0.5);line-height:1.7;margin-bottom:20px;">Players, courts, rounds &amp; leaderboard. Simple and reliable.</div>
+          <a href="/pickleball" class="btn-outline" style="font-size:11px;padding:10px 22px;">Launch V1 →</a>
         </div>
-        <div style="background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.3);border-radius:8px;padding:28px;flex:1;min-width:220px;position:relative;">
-          <div style="position:absolute;top:-10px;left:24px;background:var(--gold);color:var(--green-deep);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:20px;">New</div>
-          <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Version 2 · Firebase</div>
-          <div style="font-family:'Cormorant Garamond',serif;font-size:24px;color:var(--white);margin-bottom:10px;">Live Sync App</div>
-          <div style="font-size:13px;color:rgba(200,230,208,0.6);line-height:1.7;margin-bottom:24px;">Real-time shared data. All devices see the same scores instantly.</div>
-          <a href="/pickleball-v2" class="btn-primary" style="font-size:11px;padding:12px 28px;">Launch V2 →</a>
+
+        <!-- V2 -->
+        <div style="background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.2);border-radius:8px;padding:24px;flex:1;min-width:200px;">
+          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin-bottom:10px;">Version 2 · Firebase</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--white);margin-bottom:8px;">Live Sync</div>
+          <div style="font-size:12px;color:rgba(200,230,208,0.5);line-height:1.7;margin-bottom:20px;">Real-time shared data across all devices. Tournament history saved forever.</div>
+          <a href="/pickleball-v2" class="btn-outline" style="font-size:11px;padding:10px 22px;border-color:var(--gold);color:var(--gold-light);">Launch V2 →</a>
         </div>
+
+        <!-- V3 -->
+        <div style="background:rgba(74,158,74,0.08);border:1px solid rgba(74,158,74,0.35);border-radius:8px;padding:24px;flex:1;min-width:200px;position:relative;">
+          <div style="position:absolute;top:-11px;left:20px;background:var(--green-bright);color:#fff;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:20px;">Latest</div>
+          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--green-light);margin-bottom:10px;">Version 3 · Multi-Group</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--white);margin-bottom:8px;">Full Featured</div>
+          <div style="font-size:12px;color:rgba(200,230,208,0.5);line-height:1.7;margin-bottom:20px;">Groups per location, smarter pairings, private groups &amp; on-demand extra courts.</div>
+          <a href="/pickleball-v3" class="btn-primary" style="font-size:11px;padding:10px 22px;">Launch V3 →</a>
+        </div>
+      </div>
+
+      <!-- Release Notes -->
+      <div style="border-top:1px solid rgba(200,230,208,0.1);padding-top:40px;">
+        <p style="font-size:10px;letter-spacing:4px;text-transform:uppercase;color:var(--gold);margin-bottom:28px;">Release Notes</p>
+
+        <!-- V3 -->
+        <div style="display:flex;gap:20px;margin-bottom:32px;align-items:flex-start;">
+          <div style="flex-shrink:0;width:48px;height:48px;border-radius:50%;background:var(--green-bright);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:#fff;">V3</div>
+          <div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+              <div style="font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--white);">Multi-Group &amp; Smart Courts</div>
+              <span style="background:var(--green-bright);color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:1px;">Mar 2026</span>
+            </div>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;">
+              <li style="font-size:13px;color:rgba(200,230,208,0.65);display:flex;gap:8px;"><span style="color:var(--green-light);">+</span> Create multiple groups for different locations playing simultaneously</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.65);display:flex;gap:8px;"><span style="color:var(--green-light);">+</span> Improved round-robin algorithm — minimizes repeated partners &amp; opponents</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.65);display:flex;gap:8px;"><span style="color:var(--green-light);">+</span> Private groups with password protection (stored securely in Firebase)</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.65);display:flex;gap:8px;"><span style="color:var(--green-light);">+</span> ⚡ "Next Game" button — instantly queues idle players on a free court mid-round</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.65);display:flex;gap:8px;"><span style="color:var(--green-light);">+</span> Sub-rounds labeled 2a, 2b… so history stays clean and traceable</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.65);display:flex;gap:8px;"><span style="color:var(--green-light);">+</span> Each group has its own color, location tag, and live tournament state</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style="width:1px;height:20px;background:rgba(200,230,208,0.1);margin-left:24px;margin-bottom:12px;"></div>
+
+        <!-- V2 -->
+        <div style="display:flex;gap:20px;margin-bottom:32px;align-items:flex-start;">
+          <div style="flex-shrink:0;width:48px;height:48px;border-radius:50%;background:rgba(201,168,76,0.3);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:var(--gold);">V2</div>
+          <div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+              <div style="font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--white);">Firebase Live Sync</div>
+              <span style="background:rgba(201,168,76,0.2);color:var(--gold);font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:1px;border:1px solid rgba(201,168,76,0.3);">Feb 2026</span>
+            </div>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;">
+              <li style="font-size:13px;color:rgba(200,230,208,0.5);display:flex;gap:8px;"><span style="color:var(--gold);">+</span> Connected to Firebase Firestore for real-time data sync</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.5);display:flex;gap:8px;"><span style="color:var(--gold);">+</span> All devices see the same players, scores &amp; leaderboard instantly</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.5);display:flex;gap:8px;"><span style="color:var(--gold);">+</span> Tournament history saved permanently to the cloud</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.5);display:flex;gap:8px;"><span style="color:var(--gold);">+</span> Player list auto-saved and shared across sessions</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style="width:1px;height:20px;background:rgba(200,230,208,0.1);margin-left:24px;margin-bottom:12px;"></div>
+
+        <!-- V1 -->
+        <div style="display:flex;gap:20px;align-items:flex-start;">
+          <div style="flex-shrink:0;width:48px;height:48px;border-radius:50%;background:rgba(200,230,208,0.05);border:1px solid rgba(200,230,208,0.15);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:rgba(200,230,208,0.4);">V1</div>
+          <div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+              <div style="font-family:'Cormorant Garamond',serif;font-size:20px;color:rgba(255,255,255,0.5);">Initial Release</div>
+              <span style="background:rgba(200,230,208,0.05);color:rgba(200,230,208,0.3);font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:1px;border:1px solid rgba(200,230,208,0.1);">Jan 2026</span>
+            </div>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;">
+              <li style="font-size:13px;color:rgba(200,230,208,0.35);display:flex;gap:8px;"><span>+</span> Round-robin tournament manager with up to 30 players</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.35);display:flex;gap:8px;"><span>+</span> Score entry, leaderboard, sit-out rotation</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.35);display:flex;gap:8px;"><span>+</span> Configurable number of courts (1–7)</li>
+            </ul>
+          </div>
+        </div>
+
       </div>
     </div>
   </section>

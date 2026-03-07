@@ -18,17 +18,44 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install & Build V2
+      - name: Install dependencies
+        run: npm install
+
+      # ── V3 (latest) ──────────────────────────────────────────
+      - name: Build V3
         run: |
-          npm install
+          cp src/AppV3.tsx src/App.tsx
+          sed -i "s|base:.*,|base: '/pickleball-v3/',|" vite.config.ts
+          npm run build
+          mkdir -p deploy/pickleball-v3
+          cp -r dist/. deploy/pickleball-v3/
+
+      # ── V2 ───────────────────────────────────────────────────
+      - name: Build V2
+        run: |
+          cp src/AppV2.tsx src/App.tsx
+          sed -i "s|base:.*,|base: '/pickleball-v2/',|" vite.config.ts
           npm run build
           mkdir -p deploy/pickleball-v2
           cp -r dist/. deploy/pickleball-v2/
-          cp homepage.html deploy/index.html
 
+      # ── V1 ───────────────────────────────────────────────────
+      - name: Build V1
+        run: |
+          cp src/AppV1.tsx src/App.tsx
+          sed -i "s|base:.*,|base: '/pickleball/',|" vite.config.ts
+          npm run build
+          mkdir -p deploy/pickleball
+          cp -r dist/. deploy/pickleball/
+
+      # ── Homepage ─────────────────────────────────────────────
+      - name: Copy homepage
+        run: cp homepage.html deploy/index.html
+
+      # ── Publish ──────────────────────────────────────────────
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./deploy
-          keep_files: true
+          keep_files: false

@@ -1,554 +1,693 @@
-import { useState, useMemo, useEffect } from "react";
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, collection, deleteDoc, onSnapshot } from "firebase/firestore";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GoGreenVue — Make Dreams Possible</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyAqBFWIzNZUHCz83lnHzjHcGYfbjICAgQM",
-  authDomain: "gogreenvue-afd10.firebaseapp.com",
-  projectId: "gogreenvue-afd10",
-  storageBucket: "gogreenvue-afd10.firebasestorage.app",
-  messagingSenderId: "968289098989",
-  appId: "1:968289098989:web:da82db1feca0a70f6e00e4"
-};
-
-const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
-
-const MAX_PLAYERS = 30;
-
-const COLORS = {
-  green: "#2d6a2d", greenMid: "#4a9e4a", greenLight: "#e8f5e8",
-  yellow: "#f5c518", yellowLight: "#fffbe6", dark: "#1a3a1a",
-  white: "#ffffff", gray: "#f0f0f0", grayMid: "#ccc",
-  red: "#c0392b", blue: "#2980b9", purple: "#8e44ad",
-};
-
-const TABS = ["Players", "Courts", "Leaderboard", "History"];
-
-interface Player { name: string; id: number; }
-interface Court { courtNum: number; team1: number[]; team2: number[]; }
-interface Round { courts: Court[]; sitOuts: number[]; roundNum: number; }
-interface Score { s1: string; s2: string; done: boolean; }
-interface Stats { name: string; wins: number; points: number; played: number; }
-interface SavedTournament {
-  id: string; date: string; players: Player[];
-  rounds: Round[]; scores: Record<string, Score>; leaderboard: Stats[];
-}
-
-function Badge({ color, children }: { color: string; children: React.ReactNode }) {
-  return <span style={{ background: color, color: "#fff", borderRadius: 8, padding: "2px 10px", fontSize: 12, fontWeight: 700 }}>{children}</span>;
-}
-
-function Button({ onClick, color = COLORS.green, textColor = "#fff", children, small = false, disabled = false, outline = false }: {
-  onClick?: () => void; color?: string; textColor?: string; children: React.ReactNode;
-  small?: boolean; disabled?: boolean; outline?: boolean;
-}) {
-  return (
-    <button onClick={onClick} disabled={disabled} style={{
-      background: outline ? "transparent" : disabled ? COLORS.grayMid : color,
-      color: outline ? color : textColor, border: outline ? `2px solid ${color}` : "none",
-      borderRadius: 8, padding: small ? "5px 12px" : "9px 20px", fontWeight: 700,
-      fontSize: small ? 13 : 15, cursor: disabled ? "not-allowed" : "pointer",
-      opacity: disabled ? 0.6 : 1, transition: "opacity .15s",
-    }}>{children}</button>
-  );
-}
-
-function generateRounds(players: Player[], numCourts: number): Round[] {
-  const n = players.length;
-  if (n < 4) return [];
-  const courts = Math.min(Math.floor(n / 4), numCourts);
-  const sitOutCount = n - courts * 4;
-  const rounds: Round[] = [];
-  const sitOutCounts = new Array(n).fill(0);
-  const pool = players.map((_, i) => i);
-  for (let r = 0; r < Math.max(n - 1, 8); r++) {
-    let sitOuts: number[] = [];
-    if (sitOutCount > 0) {
-      sitOuts = [...pool].sort((a, b) => sitOutCounts[a] - sitOutCounts[b] || a - b).slice(0, sitOutCount);
+    :root {
+      --green-deep: #0d2b1a;
+      --green-mid: #1a4a2e;
+      --green-bright: #2d7a4a;
+      --green-light: #4aaa6a;
+      --green-pale: #c8e6d0;
+      --green-mist: #e8f5ec;
+      --gold: #c9a84c;
+      --gold-light: #e8c97a;
+      --white: #f7f9f7;
+      --text: #0d2b1a;
     }
-    const shuffled = [...pool.filter(p => !sitOuts.includes(p))];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = (i * 7 + r * 13) % (i + 1);
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--white);
+      color: var(--text);
+      overflow-x: hidden;
     }
-    rounds.push({
-      courts: Array.from({ length: courts }, (_, c) => ({
-        courtNum: c + 1, team1: [shuffled[c*4], shuffled[c*4+1]], team2: [shuffled[c*4+2], shuffled[c*4+3]]
-      })),
-      sitOuts, roundNum: r + 1
-    });
-    sitOuts.forEach(p => sitOutCounts[p]++);
-  }
-  return rounds;
-}
 
-function computeLeaderboard(players: Player[], rounds: Round[], scores: Record<string, Score>): Stats[] {
-  const stats: Record<number, Stats> = {};
-  players.forEach(p => { stats[p.id] = { name: p.name, wins: 0, points: 0, played: 0 }; });
-  rounds.forEach((round, ri) => {
-    round.courts.forEach((court, ci) => {
-      const sc = scores[`${ri}-${ci}`];
-      if (!sc?.done) return;
-      const s1 = parseInt(sc.s1), s2 = parseInt(sc.s2);
-      [...court.team1, ...court.team2].forEach(pid => { if (stats[players[pid]?.id]) stats[players[pid].id].played++; });
-      court.team1.forEach(pid => { const p = players[pid]; if (!p || !stats[p.id]) return; stats[p.id].points += s1; if (s1 > s2) stats[p.id].wins++; });
-      court.team2.forEach(pid => { const p = players[pid]; if (!p || !stats[p.id]) return; stats[p.id].points += s2; if (s2 > s1) stats[p.id].wins++; });
-    });
-  });
-  return Object.values(stats).sort((a, b) => b.wins - a.wins || b.points - a.points);
-}
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 48px;
+      mix-blend-mode: normal;
+      transition: background 0.4s, padding 0.4s;
+    }
+    nav.scrolled {
+      background: rgba(13, 43, 26, 0.95);
+      backdrop-filter: blur(12px);
+      padding: 16px 48px;
+    }
+    .nav-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--white);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-decoration: none;
+    }
+    .nav-links {
+      display: flex;
+      gap: 36px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: rgba(247, 249, 247, 0.8);
+      text-decoration: none;
+      font-size: 13px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--gold-light); }
 
-const LeaderboardTable = ({ lb }: { lb: Stats[] }) => (
-  <div>
-    <div style={{ display: "grid", gridTemplateColumns: "32px 1fr 60px 60px 60px", gap: 6, marginBottom: 8 }}>
-      {["#","Player","Wins","Pts","Played"].map(h => (
-        <div key={h} style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textAlign: h==="Player" ? "left" : "center" }}>{h}</div>
-      ))}
-    </div>
-    {lb.map((p, i) => (
-      <div key={p.name} style={{
-        display: "grid", gridTemplateColumns: "32px 1fr 60px 60px 60px", gap: 6,
-        alignItems: "center", padding: "9px 0", borderTop: `1px solid ${COLORS.gray}`,
-        background: i===0 ? COLORS.yellowLight : i<3 ? COLORS.greenLight : "transparent",
-        borderRadius: 8, paddingLeft: 8
-      }}>
-        <div style={{ fontWeight: 900, color: i===0?COLORS.yellow:i<3?COLORS.greenMid:"#aaa", textAlign:"center" }}>
-          {i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}
-        </div>
-        <div style={{ fontWeight: 700, color: COLORS.dark }}>{p.name}</div>
-        <div style={{ textAlign:"center", fontWeight:700, color: COLORS.green }}>{p.wins}</div>
-        <div style={{ textAlign:"center", color:"#555" }}>{p.points}</div>
-        <div style={{ textAlign:"center", color:"#aaa", fontSize:13 }}>{p.played}</div>
+    /* ── HERO ── */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: var(--green-deep);
+    }
+
+    /* Layered background */
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 50%, rgba(45, 122, 74, 0.3) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 30%, rgba(26, 74, 46, 0.5) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 60% 80%, rgba(201, 168, 76, 0.1) 0%, transparent 50%),
+        linear-gradient(160deg, #0a1f12 0%, #0d2b1a 40%, #122b1d 100%);
+    }
+
+    /* Floating leaves */
+    .leaves {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .leaf {
+      position: absolute;
+      opacity: 0.06;
+      animation: float linear infinite;
+    }
+    .leaf svg { fill: var(--green-light); }
+
+    @keyframes float {
+      0% { transform: translateY(110vh) rotate(0deg); opacity: 0; }
+      10% { opacity: 0.06; }
+      90% { opacity: 0.06; }
+      100% { transform: translateY(-10vh) rotate(360deg); opacity: 0; }
+    }
+
+    /* Grid texture overlay */
+    .hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(200, 230, 208, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(200, 230, 208, 0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      padding: 0 24px;
+      max-width: 900px;
+    }
+
+    .hero-eyebrow {
+      font-size: 11px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--gold);
+      font-weight: 500;
+      margin-bottom: 28px;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.3s forwards;
+    }
+
+    .hero-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(56px, 9vw, 110px);
+      font-weight: 300;
+      line-height: 1.0;
+      color: var(--white);
+      letter-spacing: -1px;
+      margin-bottom: 12px;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.5s forwards;
+    }
+
+    .hero-title em {
+      font-style: italic;
+      color: var(--green-pale);
+    }
+
+    .hero-subtitle {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(28px, 4vw, 48px);
+      font-weight: 300;
+      font-style: italic;
+      color: var(--gold-light);
+      margin-bottom: 40px;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.7s forwards;
+    }
+
+    .hero-desc {
+      font-size: 16px;
+      color: rgba(200, 230, 208, 0.7);
+      line-height: 1.8;
+      max-width: 480px;
+      margin: 0 auto 52px;
+      font-weight: 300;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 0.9s forwards;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      opacity: 0;
+      animation: fadeUp 0.8s ease 1.1s forwards;
+    }
+
+    .btn-primary {
+      background: var(--gold);
+      color: var(--green-deep);
+      padding: 16px 40px;
+      border-radius: 2px;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: background 0.2s, transform 0.2s;
+      display: inline-block;
+    }
+    .btn-primary:hover {
+      background: var(--gold-light);
+      transform: translateY(-2px);
+    }
+
+    .btn-outline {
+      border: 1px solid rgba(200, 230, 208, 0.4);
+      color: var(--green-pale);
+      padding: 16px 40px;
+      border-radius: 2px;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: border-color 0.2s, color 0.2s, transform 0.2s;
+      display: inline-block;
+    }
+    .btn-outline:hover {
+      border-color: var(--gold);
+      color: var(--gold-light);
+      transform: translateY(-2px);
+    }
+
+    /* Scroll indicator */
+    .scroll-hint {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      color: rgba(200, 230, 208, 0.4);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      animation: fadeUp 1s ease 1.5s both;
+    }
+    .scroll-line {
+      width: 1px;
+      height: 48px;
+      background: linear-gradient(to bottom, rgba(200, 230, 208, 0.4), transparent);
+      animation: scrollPulse 2s ease-in-out infinite;
+    }
+    @keyframes scrollPulse {
+      0%, 100% { opacity: 0.4; transform: scaleY(1); }
+      50% { opacity: 1; transform: scaleY(1.2); }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── MARQUEE ── */
+    .marquee-section {
+      background: var(--green-mid);
+      padding: 20px 0;
+      overflow: hidden;
+      border-top: 1px solid rgba(74, 170, 106, 0.2);
+      border-bottom: 1px solid rgba(74, 170, 106, 0.2);
+    }
+    .marquee-track {
+      display: flex;
+      gap: 0;
+      animation: marquee 30s linear infinite;
+      width: max-content;
+    }
+    .marquee-item {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 0 40px;
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(200, 230, 208, 0.6);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .marquee-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--gold);
+      flex-shrink: 0;
+    }
+    @keyframes marquee {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+
+    /* ── FEATURES ── */
+    .features {
+      padding: 120px 48px;
+      background: var(--white);
+    }
+    .section-header {
+      text-align: center;
+      margin-bottom: 80px;
+    }
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--green-bright);
+      font-weight: 500;
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(36px, 5vw, 58px);
+      font-weight: 300;
+      color: var(--green-deep);
+      line-height: 1.1;
+    }
+    .section-title em {
+      font-style: italic;
+      color: var(--green-bright);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 2px;
+      max-width: 1100px;
+      margin: 0 auto;
+      background: var(--green-pale);
+    }
+    .feature-card {
+      background: var(--white);
+      padding: 52px 40px;
+      transition: background 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 0; height: 3px;
+      background: var(--gold);
+      transition: width 0.4s ease;
+    }
+    .feature-card:hover { background: var(--green-mist); }
+    .feature-card:hover::before { width: 100%; }
+
+    .feature-num {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 64px;
+      font-weight: 300;
+      color: var(--green-pale);
+      line-height: 1;
+      margin-bottom: 24px;
+      transition: color 0.3s;
+    }
+    .feature-card:hover .feature-num { color: var(--green-bright); opacity: 0.3; }
+
+    .feature-icon {
+      font-size: 32px;
+      margin-bottom: 20px;
+    }
+    .feature-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--green-deep);
+      margin-bottom: 14px;
+    }
+    .feature-desc {
+      font-size: 14px;
+      color: #5a7a65;
+      line-height: 1.8;
+      font-weight: 300;
+    }
+
+    /* ── PICKLEBALL CTA ── */
+    .pickleball-section {
+      background: var(--green-deep);
+      padding: 100px 48px;
+      position: relative;
+      overflow: hidden;
+    }
+    .pickleball-section::before {
+      content: '🥒';
+      position: absolute;
+      font-size: 300px;
+      right: -40px;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0.05;
+      pointer-events: none;
+    }
+    .pickleball-inner {
+      max-width: 700px;
+      position: relative;
+      z-index: 1;
+    }
+    .pickleball-label {
+      font-size: 10px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 24px;
+    }
+    .pickleball-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(36px, 5vw, 60px);
+      font-weight: 300;
+      color: var(--white);
+      line-height: 1.1;
+      margin-bottom: 24px;
+    }
+    .pickleball-desc {
+      font-size: 15px;
+      color: rgba(200, 230, 208, 0.7);
+      line-height: 1.8;
+      margin-bottom: 40px;
+      font-weight: 300;
+      max-width: 480px;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      background: #070f0a;
+      padding: 60px 48px 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      border-top: 1px solid rgba(74, 170, 106, 0.1);
+    }
+    .footer-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 28px;
+      font-weight: 300;
+      color: var(--white);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+    }
+    .footer-tagline {
+      font-size: 12px;
+      color: rgba(200, 230, 208, 0.4);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .footer-divider {
+      width: 60px;
+      height: 1px;
+      background: var(--gold);
+      opacity: 0.4;
+    }
+    .footer-copy {
+      font-size: 11px;
+      color: rgba(200, 230, 208, 0.3);
+      letter-spacing: 1px;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      nav { padding: 20px 24px; }
+      nav.scrolled { padding: 14px 24px; }
+      .nav-links { display: none; }
+      .features { padding: 80px 24px; }
+      .pickleball-section { padding: 80px 24px; }
+      footer { padding: 48px 24px 32px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav id="navbar">
+    <a href="/" class="nav-logo">GoGreenVue</a>
+    <ul class="nav-links">
+      <li><a href="#about">About</a></li>
+      <li><a href="#features">Releases</a></li>
+      <li><a href="/pickleball-v3" style="color:var(--green-light);">🥒 Pickleball V3</a></li>
+    </ul>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-grid"></div>
+
+    <!-- Floating leaves -->
+    <div class="leaves">
+      <div class="leaf" style="left:10%;animation-duration:18s;animation-delay:0s;font-size:40px;">
+        <svg viewBox="0 0 100 100" width="40" height="40"><ellipse cx="50" cy="50" rx="20" ry="45" transform="rotate(30 50 50)"/></svg>
       </div>
-    ))}
-    {lb.every(p => p.played === 0) && <div style={{ color:"#aaa", textAlign:"center", padding:20 }}>No scores yet.</div>}
+      <div class="leaf" style="left:25%;animation-duration:22s;animation-delay:4s;font-size:30px;">
+        <svg viewBox="0 0 100 100" width="30" height="30"><ellipse cx="50" cy="50" rx="18" ry="40" transform="rotate(-20 50 50)"/></svg>
+      </div>
+      <div class="leaf" style="left:50%;animation-duration:16s;animation-delay:8s;">
+        <svg viewBox="0 0 100 100" width="50" height="50"><ellipse cx="50" cy="50" rx="22" ry="48" transform="rotate(10 50 50)"/></svg>
+      </div>
+      <div class="leaf" style="left:70%;animation-duration:20s;animation-delay:2s;">
+        <svg viewBox="0 0 100 100" width="35" height="35"><ellipse cx="50" cy="50" rx="16" ry="42" transform="rotate(-40 50 50)"/></svg>
+      </div>
+      <div class="leaf" style="left:85%;animation-duration:25s;animation-delay:6s;">
+        <svg viewBox="0 0 100 100" width="28" height="28"><ellipse cx="50" cy="50" rx="20" ry="44" transform="rotate(55 50 50)"/></svg>
+      </div>
+    </div>
+
+    <div class="hero-content">
+      <p class="hero-eyebrow">Welcome to GoGreenVue</p>
+      <h1 class="hero-title">Make <em>Dreams</em><br>Possible</h1>
+      <p class="hero-subtitle">One step at a time.</p>
+      <p class="hero-desc">A space where ideas grow, communities connect, and every vision finds its path forward.</p>
+      <div class="hero-cta">
+        <a href="#about" class="btn-primary">Explore</a>
+        <a href="/pickleball-v3" class="btn-outline" style="border-color:var(--green-light);color:var(--green-light);">🥒 Pickleball V3 — Latest</a>
+      </div>
+    </div>
+
+    <div class="scroll-hint">
+      <div class="scroll-line"></div>
+      <span>Scroll</span>
+    </div>
+  </section>
+
+  <!-- MARQUEE -->
+  <div class="marquee-section">
+    <div class="marquee-track">
+      <div class="marquee-item"><span>Make Dreams Possible</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>GoGreenVue</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>Grow Together</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>One Step at a Time</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>Dream Big</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>GoGreenVue</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>Make Dreams Possible</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>GoGreenVue</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>Grow Together</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>One Step at a Time</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>Dream Big</span><div class="marquee-dot"></div></div>
+      <div class="marquee-item"><span>GoGreenVue</span><div class="marquee-dot"></div></div>
+    </div>
   </div>
-);
 
-export default function App() {
-  const [tab, setTab] = useState("Players");
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [nameInput, setNameInput] = useState("");
-  const [numCourts, setNumCourts] = useState(4);
-  const [rounds, setRounds] = useState<Round[]>([]);
-  const [currentRound, setCurrentRound] = useState(0);
-  const [tournamentStarted, setTournamentStarted] = useState(false);
-  const [scores, setScores] = useState<Record<string, Score>>({});
-  const [history, setHistory] = useState<SavedTournament[]>([]);
-  const [selectedHistory, setSelectedHistory] = useState<SavedTournament | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState("");
-  const [syncMsg, setSyncMsg] = useState("");
-
-  // Load players and history from Firestore on mount, then listen for real-time updates
-  useEffect(() => {
-    setLoading(true);
-
-    // Real-time listener for players
-    const unsubPlayers = onSnapshot(doc(db, "pickleball", "players"), (snap) => {
-      if (snap.exists()) {
-        setPlayers(snap.data().list || []);
-      }
-      setLoading(false);
-    }, () => setLoading(false));
-
-    // Real-time listener for history
-    const unsubHistory = onSnapshot(collection(db, "pickleball_history"), (snap) => {
-      const tournaments: SavedTournament[] = [];
-      snap.forEach(d => tournaments.push(d.data() as SavedTournament));
-      tournaments.sort((a, b) => parseInt(b.id) - parseInt(a.id));
-      setHistory(tournaments);
-    });
-
-    // Real-time listener for active tournament
-    const unsubTournament = onSnapshot(doc(db, "pickleball", "activeTournament"), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.started) {
-          setRounds(data.rounds || []);
-          setScores(data.scores || {});
-          setCurrentRound(data.currentRound || 0);
-          setTournamentStarted(true);
-          setSyncMsg("🔄 Synced");
-          setTimeout(() => setSyncMsg(""), 2000);
-        }
-      }
-    });
-
-    return () => { unsubPlayers(); unsubHistory(); unsubTournament(); };
-  }, []);
-
-  // Save players to Firestore whenever they change
-  const savePlayers = async (newPlayers: Player[]) => {
-    try {
-      await setDoc(doc(db, "pickleball", "players"), { list: newPlayers });
-    } catch (e) { console.error(e); }
-  };
-
-  // Save active tournament state to Firestore
-  const saveTournamentState = async (r: Round[], s: Record<string, Score>, cr: number) => {
-    try {
-      await setDoc(doc(db, "pickleball", "activeTournament"), {
-        started: true, rounds: r, scores: s, currentRound: cr,
-        updatedAt: Date.now()
-      });
-    } catch (e) { console.error(e); }
-  };
-
-  const addPlayer = async () => {
-    const name = nameInput.trim();
-    if (!name || players.length >= MAX_PLAYERS || players.find(p => p.name.toLowerCase() === name.toLowerCase())) return;
-    const newPlayers = [...players, { name, id: Date.now() }];
-    setPlayers(newPlayers);
-    setNameInput("");
-    await savePlayers(newPlayers);
-  };
-
-  const removePlayer = async (id: number) => {
-    const newPlayers = players.filter(p => p.id !== id);
-    setPlayers(newPlayers);
-    await savePlayers(newPlayers);
-  };
-
-  const startTournament = async () => {
-    if (players.length < 4) return;
-    const newRounds = generateRounds(players, numCourts);
-    const newScores = {};
-    setRounds(newRounds);
-    setScores(newScores);
-    setCurrentRound(0);
-    setTournamentStarted(true);
-    setTab("Courts");
-    await saveTournamentState(newRounds, newScores, 0);
-  };
-
-  const getScore = (ri: number, ci: number): Score => scores[`${ri}-${ci}`] || { s1: "", s2: "", done: false };
-
-  const submitScore = async (ri: number, ci: number) => {
-    const s = getScore(ri, ci);
-    const s1 = parseInt(s.s1), s2 = parseInt(s.s2);
-    if (isNaN(s1) || isNaN(s2) || s1 < 0 || s2 < 0) return;
-    const newScores = { ...scores, [`${ri}-${ci}`]: { ...s, done: true } };
-    setScores(newScores);
-    await saveTournamentState(rounds, newScores, currentRound);
-  };
-
-  const setScoreField = async (ri: number, ci: number, field: keyof Score, val: string | boolean) => {
-    const newScores = { ...scores, [`${ri}-${ci}`]: { ...getScore(ri, ci), [field]: val } };
-    setScores(newScores);
-  };
-
-  const editScore = async (ri: number, ci: number) => {
-    const newScores = { ...scores, [`${ri}-${ci}`]: { ...getScore(ri, ci), done: false } };
-    setScores(newScores);
-    await saveTournamentState(rounds, newScores, currentRound);
-  };
-
-  const goToRound = async (r: number) => {
-    setCurrentRound(r);
-    await saveTournamentState(rounds, scores, r);
-  };
-
-  const endTournament = async () => {
-    setSaving(true);
-    try {
-      const lb = computeLeaderboard(players, rounds, scores);
-      const tournament: SavedTournament = {
-        id: Date.now().toString(),
-        date: new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
-        players, rounds, scores, leaderboard: lb,
-      };
-      await setDoc(doc(db, "pickleball_history", tournament.id), tournament);
-      await setDoc(doc(db, "pickleball", "activeTournament"), { started: false });
-      setTournamentStarted(false);
-      setRounds([]); setScores({}); setCurrentRound(0);
-      setSaveMsg("✅ Tournament saved!");
-      setTimeout(() => setSaveMsg(""), 3000);
-      setTab("History");
-    } catch (e) { console.error(e); }
-    setSaving(false);
-  };
-
-  const deleteHistory = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, "pickleball_history", id));
-      if (selectedHistory?.id === id) setSelectedHistory(null);
-    } catch (e) { console.error(e); }
-  };
-
-  const roundDone = useMemo(() => {
-    if (!tournamentStarted || !rounds[currentRound]) return false;
-    return rounds[currentRound].courts.every((_, ci) => getScore(currentRound, ci).done);
-  }, [scores, currentRound, rounds, tournamentStarted]);
-
-  const leaderboard = useMemo<Stats[]>(() => {
-    if (!tournamentStarted) return [];
-    return computeLeaderboard(players, rounds, scores);
-  }, [scores, rounds, players, tournamentStarted]);
-
-  const round = tournamentStarted ? rounds[currentRound] : null;
-
-  if (loading) return (
-    <div style={{ minHeight: "100vh", background: COLORS.greenLight, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
-      <div style={{ fontSize: 40 }}>🥒</div>
-      <div style={{ color: COLORS.green, fontWeight: 700, fontSize: 18 }}>Loading...</div>
+  <!-- FEATURES -->
+  <section class="features" id="about">
+    <div class="section-header">
+      <p class="section-label">Our Vision</p>
+      <h2 class="section-title">A place where<br><em>everything begins</em></h2>
     </div>
-  );
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-num">01</div>
+        <div class="feature-icon">🌱</div>
+        <h3 class="feature-title">Grow</h3>
+        <p class="feature-desc">Every great journey starts with a single seed. We believe in nurturing ideas from the ground up, giving them the space and support to flourish.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-num">02</div>
+        <div class="feature-icon">🤝</div>
+        <h3 class="feature-title">Connect</h3>
+        <p class="feature-desc">Dreams are built together. We bring people, tools, and opportunities into one space to create something greater than the sum of its parts.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-num">03</div>
+        <div class="feature-icon">✨</div>
+        <h3 class="feature-title">Achieve</h3>
+        <p class="feature-desc">From vision to reality — we provide the tools and community to turn what seems impossible into something you can touch, see, and share.</p>
+      </div>
+    </div>
+  </section>
 
-  return (
-    <div style={{ minHeight: "100vh", background: COLORS.greenLight, fontFamily: "'Segoe UI', sans-serif" }}>
-      {/* Header */}
-      <div style={{ background: COLORS.green, padding: "14px 20px", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 2px 8px #0003" }}>
-        <span style={{ fontSize: 28 }}>🥒</span>
-        <div>
-          <div style={{ color: COLORS.yellow, fontWeight: 900, fontSize: 20, letterSpacing: 1 }}>PICKLEBALL</div>
-          <div style={{ color: "#fff", fontSize: 12, fontWeight: 600, letterSpacing: 2 }}>ROUND-ROBIN MANAGER</div>
+  <!-- PICKLEBALL CTA -->
+  <section class="pickleball-section" id="features">
+    <div class="pickleball-inner" style="max-width:900px;">
+      <p class="pickleball-label">Community · Sport · Fun</p>
+      <h2 class="pickleball-title">Play Pickleball<br>with your community</h2>
+      <p class="pickleball-desc">Organize round-robin tournaments effortlessly. Manage players, courts, scores, and leaderboards — all in one place.</p>
+
+      <!-- Version cards -->
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:56px;">
+
+        <!-- V1 -->
+        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(200,230,208,0.12);border-radius:8px;padding:24px;flex:1;min-width:200px;">
+          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(200,230,208,0.4);margin-bottom:10px;">Version 1 · Stable</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--white);margin-bottom:8px;">Classic</div>
+          <div style="font-size:12px;color:rgba(200,230,208,0.5);line-height:1.7;margin-bottom:20px;">Players, courts, rounds &amp; leaderboard. Simple and reliable.</div>
+          <a href="/pickleball" class="btn-outline" style="font-size:11px;padding:10px 22px;">Launch V1 →</a>
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-          {syncMsg && <span style={{ color: COLORS.yellow, fontSize: 12 }}>{syncMsg}</span>}
-          {saveMsg && <span style={{ color: COLORS.yellow, fontSize: 12 }}>{saveMsg}</span>}
-          {saving && <span style={{ color: COLORS.yellow, fontSize: 12 }}>Saving...</span>}
-          {tournamentStarted && (
-            <Button small outline color={COLORS.yellow} textColor={COLORS.yellow} onClick={endTournament}>💾 End & Save</Button>
-          )}
+
+        <!-- V2 -->
+        <div style="background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.2);border-radius:8px;padding:24px;flex:1;min-width:200px;">
+          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(201,168,76,0.6);margin-bottom:10px;">Version 2 · Firebase</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--white);margin-bottom:8px;">Live Sync</div>
+          <div style="font-size:12px;color:rgba(200,230,208,0.5);line-height:1.7;margin-bottom:20px;">Real-time shared data across all devices. Tournament history saved forever.</div>
+          <a href="/pickleball-v2" class="btn-outline" style="font-size:11px;padding:10px 22px;border-color:var(--gold);color:var(--gold-light);">Launch V2 →</a>
+        </div>
+
+        <!-- V3 -->
+        <div style="background:rgba(74,158,74,0.08);border:1px solid rgba(74,158,74,0.35);border-radius:8px;padding:24px;flex:1;min-width:200px;position:relative;">
+          <div style="position:absolute;top:-11px;left:20px;background:var(--green-bright);color:#fff;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;border-radius:20px;">Latest</div>
+          <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--green-light);margin-bottom:10px;">Version 3 · Multi-Group</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--white);margin-bottom:8px;">Full Featured</div>
+          <div style="font-size:12px;color:rgba(200,230,208,0.5);line-height:1.7;margin-bottom:20px;">Groups per location, smarter pairings, private groups &amp; on-demand extra courts.</div>
+          <a href="/pickleball-v3" class="btn-primary" style="font-size:11px;padding:10px 22px;">Launch V3 →</a>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", background: COLORS.dark, justifyContent: "center" }}>
-        {TABS.map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            flex: 1, maxWidth: 180, padding: "11px 0", border: "none", cursor: "pointer",
-            background: tab === t ? COLORS.yellow : "transparent",
-            color: tab === t ? COLORS.dark : "#aaa", fontWeight: 800, fontSize: 13, letterSpacing: 1,
-            borderBottom: tab === t ? `3px solid ${COLORS.yellow}` : "3px solid transparent", transition: "all .15s",
-          }}>
-            {t.toUpperCase()}
-            {t === "History" && history.length > 0 && (
-              <span style={{ marginLeft: 4, background: COLORS.purple, color: "#fff", borderRadius: 10, padding: "1px 6px", fontSize: 10 }}>{history.length}</span>
-            )}
-          </button>
-        ))}
-      </div>
+      <!-- Release Notes -->
+      <div style="border-top:1px solid rgba(200,230,208,0.1);padding-top:40px;">
+        <p style="font-size:10px;letter-spacing:4px;text-transform:uppercase;color:var(--gold);margin-bottom:28px;">Release Notes</p>
 
-      <div style={{ maxWidth: 700, margin: "0 auto", padding: "20px 16px" }}>
-
-        {/* ── PLAYERS TAB ── */}
-        {tab === "Players" && (
+        <!-- V3 -->
+        <div style="display:flex;gap:20px;margin-bottom:32px;align-items:flex-start;">
+          <div style="flex-shrink:0;width:48px;height:48px;border-radius:50%;background:var(--green-bright);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:#fff;">V3</div>
           <div>
-            <div style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 2px 8px #0001", marginBottom: 16 }}>
-              <div style={{ fontWeight: 800, color: COLORS.dark, fontSize: 16, marginBottom: 12 }}>
-                Add Players <Badge color={COLORS.greenMid}>{players.length}/{MAX_PLAYERS}</Badge>
-                <span style={{ fontSize: 11, color: COLORS.greenMid, fontWeight: 500, marginLeft: 8 }}>🔥 Live sync</span>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input value={nameInput} onChange={e => setNameInput(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && addPlayer()} placeholder="Player name..." maxLength={30}
-                  style={{ flex: 1, padding: "9px 14px", borderRadius: 8, border: `2px solid ${COLORS.grayMid}`, fontSize: 15, outline: "none" }} />
-                <Button onClick={addPlayer} disabled={!nameInput.trim() || players.length >= MAX_PLAYERS}>+ Add</Button>
-              </div>
-              <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
-                {players.length === 0 && <div style={{ color: "#aaa", textAlign: "center", padding: 20 }}>No players yet. Add up to 30!</div>}
-                {players.map((p, i) => (
-                  <div key={p.id} style={{ display: "flex", alignItems: "center", background: COLORS.greenLight, borderRadius: 8, padding: "7px 12px" }}>
-                    <span style={{ color: COLORS.greenMid, fontWeight: 700, width: 26 }}>{i + 1}.</span>
-                    <span style={{ flex: 1, fontWeight: 600, color: COLORS.dark }}>{p.name}</span>
-                    {!tournamentStarted && <button onClick={() => removePlayer(p.id)} style={{ background: "none", border: "none", color: COLORS.red, cursor: "pointer", fontSize: 18 }}>×</button>}
-                  </div>
-                ))}
-              </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+              <div style="font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--white);">Multi-Group &amp; Smart Courts</div>
+              <span style="background:var(--green-bright);color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:1px;">Mar 2026</span>
             </div>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;">
+              <li style="font-size:13px;color:rgba(200,230,208,0.65);display:flex;gap:8px;"><span style="color:var(--green-light);">+</span> Create multiple groups for different locations playing simultaneously</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.65);display:flex;gap:8px;"><span style="color:var(--green-light);">+</span> Improved round-robin algorithm — minimizes repeated partners &amp; opponents</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.65);display:flex;gap:8px;"><span style="color:var(--green-light);">+</span> Private groups with password protection (stored securely in Firebase)</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.65);display:flex;gap:8px;"><span style="color:var(--green-light);">+</span> ⚡ "Next Game" button — instantly queues idle players on a free court mid-round</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.65);display:flex;gap:8px;"><span style="color:var(--green-light);">+</span> Sub-rounds labeled 2a, 2b… so history stays clean and traceable</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.65);display:flex;gap:8px;"><span style="color:var(--green-light);">+</span> Each group has its own color, location tag, and live tournament state</li>
+            </ul>
+          </div>
+        </div>
 
-            <div style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 2px 8px #0001", marginBottom: 16 }}>
-              <div style={{ fontWeight: 800, color: COLORS.dark, fontSize: 16, marginBottom: 12 }}>Court Settings</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                <span style={{ color: "#555" }}>Number of courts:</span>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {[1,2,3,4,5,6,7].map(n => (
-                    <button key={n} onClick={() => setNumCourts(n)} style={{
-                      width: 36, height: 36, borderRadius: 8, border: "2px solid",
-                      borderColor: numCourts === n ? COLORS.green : COLORS.grayMid,
-                      background: numCourts === n ? COLORS.green : "#fff",
-                      color: numCourts === n ? "#fff" : COLORS.dark, fontWeight: 700, cursor: "pointer"
-                    }}>{n}</button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ marginTop: 10, color: "#888", fontSize: 13 }}>
-                {players.length} players → {Math.min(Math.floor(players.length/4), numCourts)} active court(s), {Math.max(0, players.length - Math.min(Math.floor(players.length/4), numCourts)*4)} sitting out per round
-              </div>
+        <div style="width:1px;height:20px;background:rgba(200,230,208,0.1);margin-left:24px;margin-bottom:12px;"></div>
+
+        <!-- V2 -->
+        <div style="display:flex;gap:20px;margin-bottom:32px;align-items:flex-start;">
+          <div style="flex-shrink:0;width:48px;height:48px;border-radius:50%;background:rgba(201,168,76,0.3);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:var(--gold);">V2</div>
+          <div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+              <div style="font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--white);">Firebase Live Sync</div>
+              <span style="background:rgba(201,168,76,0.2);color:var(--gold);font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:1px;border:1px solid rgba(201,168,76,0.3);">Feb 2026</span>
             </div>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;">
+              <li style="font-size:13px;color:rgba(200,230,208,0.5);display:flex;gap:8px;"><span style="color:var(--gold);">+</span> Connected to Firebase Firestore for real-time data sync</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.5);display:flex;gap:8px;"><span style="color:var(--gold);">+</span> All devices see the same players, scores &amp; leaderboard instantly</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.5);display:flex;gap:8px;"><span style="color:var(--gold);">+</span> Tournament history saved permanently to the cloud</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.5);display:flex;gap:8px;"><span style="color:var(--gold);">+</span> Player list auto-saved and shared across sessions</li>
+            </ul>
+          </div>
+        </div>
 
-            <div style={{ textAlign: "center" }}>
-              <Button onClick={startTournament} disabled={players.length < 4} color={COLORS.yellow} textColor={COLORS.dark}>
-                🎾 Start Tournament ({players.length} players)
-              </Button>
-              {players.length < 4 && <div style={{ color: "#888", marginTop: 8, fontSize: 13 }}>Need at least 4 players to start</div>}
+        <div style="width:1px;height:20px;background:rgba(200,230,208,0.1);margin-left:24px;margin-bottom:12px;"></div>
+
+        <!-- V1 -->
+        <div style="display:flex;gap:20px;align-items:flex-start;">
+          <div style="flex-shrink:0;width:48px;height:48px;border-radius:50%;background:rgba(200,230,208,0.05);border:1px solid rgba(200,230,208,0.15);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:rgba(200,230,208,0.4);">V1</div>
+          <div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+              <div style="font-family:'Cormorant Garamond',serif;font-size:20px;color:rgba(255,255,255,0.5);">Initial Release</div>
+              <span style="background:rgba(200,230,208,0.05);color:rgba(200,230,208,0.3);font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:1px;border:1px solid rgba(200,230,208,0.1);">Jan 2026</span>
             </div>
+            <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;">
+              <li style="font-size:13px;color:rgba(200,230,208,0.35);display:flex;gap:8px;"><span>+</span> Round-robin tournament manager with up to 30 players</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.35);display:flex;gap:8px;"><span>+</span> Score entry, leaderboard, sit-out rotation</li>
+              <li style="font-size:13px;color:rgba(200,230,208,0.35);display:flex;gap:8px;"><span>+</span> Configurable number of courts (1–7)</li>
+            </ul>
           </div>
-        )}
-
-        {/* ── COURTS TAB ── */}
-        {tab === "Courts" && (
-          <div>
-            {!tournamentStarted || !round ? (
-              <div style={{ textAlign: "center", color: "#888", padding: 40 }}>Set up players first, then start the tournament.</div>
-            ) : (
-              <>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                  <Button small outline color={COLORS.green} onClick={() => goToRound(Math.max(0, currentRound-1))} disabled={currentRound === 0}>← Prev</Button>
-                  <div style={{ fontWeight: 800, color: COLORS.dark, fontSize: 17 }}>
-                    Round {currentRound + 1} <span style={{ color: "#aaa", fontWeight: 400, fontSize: 13 }}>of {rounds.length}</span>
-                  </div>
-                  <Button small outline color={COLORS.green} onClick={() => goToRound(Math.min(rounds.length-1, currentRound+1))} disabled={currentRound === rounds.length-1}>Next →</Button>
-                </div>
-
-                {round.sitOuts.length > 0 && (
-                  <div style={{ background: COLORS.yellowLight, border: `1px solid ${COLORS.yellow}`, borderRadius: 10, padding: "8px 14px", marginBottom: 14, fontSize: 13, color: COLORS.dark }}>
-                    <strong>Sitting out:</strong> {round.sitOuts.map(i => players[i]?.name).join(", ")}
-                  </div>
-                )}
-
-                {round.courts.map((court, ci) => {
-                  const sc = getScore(currentRound, ci);
-                  const winner = sc.done ? (parseInt(sc.s1) > parseInt(sc.s2) ? 1 : 2) : null;
-                  return (
-                    <div key={ci} style={{ background: "#fff", borderRadius: 12, padding: 18, marginBottom: 14, boxShadow: "0 2px 8px #0001", borderLeft: `5px solid ${COLORS.greenMid}` }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                        <div style={{ fontWeight: 800, color: COLORS.green, fontSize: 15 }}>🏓 Court {court.courtNum}</div>
-                        {sc.done && <Badge color={COLORS.greenMid}>✓ Score Entered</Badge>}
-                      </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 8, alignItems: "center" }}>
-                        <div style={{ background: winner===1?COLORS.greenLight:COLORS.gray, borderRadius: 10, padding: "10px 14px", border: winner===1?`2px solid ${COLORS.greenMid}`:"2px solid transparent" }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.greenMid, marginBottom: 4 }}>TEAM 1</div>
-                          {court.team1.map(pi => <div key={pi} style={{ fontWeight: 600, color: COLORS.dark, fontSize: 14 }}>{players[pi]?.name}</div>)}
-                        </div>
-                        <div style={{ textAlign: "center", fontWeight: 900, color: COLORS.grayMid, fontSize: 16 }}>VS</div>
-                        <div style={{ background: winner===2?COLORS.greenLight:COLORS.gray, borderRadius: 10, padding: "10px 14px", border: winner===2?`2px solid ${COLORS.greenMid}`:"2px solid transparent" }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.greenMid, marginBottom: 4 }}>TEAM 2</div>
-                          {court.team2.map(pi => <div key={pi} style={{ fontWeight: 600, color: COLORS.dark, fontSize: 14 }}>{players[pi]?.name}</div>)}
-                        </div>
-                      </div>
-                      <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
-                        {sc.done ? (
-                          <>
-                            <div style={{ fontWeight: 900, fontSize: 22, color: COLORS.dark }}>{sc.s1} — {sc.s2}</div>
-                            <Button small outline color={COLORS.blue} onClick={() => editScore(currentRound, ci)}>Edit</Button>
-                          </>
-                        ) : (
-                          <>
-                            <input type="number" min={0} max={25} value={sc.s1}
-                              onChange={e => setScoreField(currentRound, ci, "s1", e.target.value)} placeholder="T1"
-                              style={{ width: 56, padding: "7px 10px", borderRadius: 8, border: `2px solid ${COLORS.grayMid}`, fontSize: 18, fontWeight: 700, textAlign: "center" }} />
-                            <span style={{ fontWeight: 900, color: "#aaa" }}>—</span>
-                            <input type="number" min={0} max={25} value={sc.s2}
-                              onChange={e => setScoreField(currentRound, ci, "s2", e.target.value)} placeholder="T2"
-                              style={{ width: 56, padding: "7px 10px", borderRadius: 8, border: `2px solid ${COLORS.grayMid}`, fontSize: 18, fontWeight: 700, textAlign: "center" }} />
-                            <Button small onClick={() => submitScore(currentRound, ci)} disabled={sc.s1===""||sc.s2===""} color={COLORS.green}>✓ Save</Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {roundDone && (
-                  <div style={{ textAlign: "center", marginTop: 10 }}>
-                    <div style={{ color: COLORS.green, fontWeight: 700, marginBottom: 8 }}>✅ Round {currentRound+1} complete!</div>
-                    {currentRound < rounds.length - 1
-                      ? <Button onClick={() => goToRound(currentRound+1)} color={COLORS.yellow} textColor={COLORS.dark}>Next Round →</Button>
-                      : <Button onClick={() => setTab("Leaderboard")} color={COLORS.yellow} textColor={COLORS.dark}>🏆 View Final Standings</Button>
-                    }
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* ── LEADERBOARD TAB ── */}
-        {tab === "Leaderboard" && (
-          <div>
-            {!tournamentStarted ? (
-              <div style={{ textAlign: "center", color: "#888", padding: 40 }}>Start a tournament to see standings.</div>
-            ) : (
-              <div style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 2px 8px #0001" }}>
-                <div style={{ fontWeight: 800, color: COLORS.dark, fontSize: 17, marginBottom: 14 }}>🏆 Current Standings</div>
-                <LeaderboardTable lb={leaderboard} />
-                <div style={{ marginTop: 20, textAlign: "center" }}>
-                  <Button onClick={endTournament} color={COLORS.purple}>💾 End Tournament & Save to History</Button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── HISTORY TAB ── */}
-        {tab === "History" && (
-          <div>
-            {selectedHistory ? (
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                  <Button small outline color={COLORS.green} onClick={() => setSelectedHistory(null)}>← Back</Button>
-                  <div style={{ fontWeight: 800, color: COLORS.dark, fontSize: 16 }}>📅 {selectedHistory.date}</div>
-                </div>
-                <div style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 2px 8px #0001", marginBottom: 16 }}>
-                  <div style={{ fontWeight: 800, color: COLORS.dark, fontSize: 15, marginBottom: 12 }}>🏆 Final Standings</div>
-                  <LeaderboardTable lb={selectedHistory.leaderboard} />
-                </div>
-                <div style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 2px 8px #0001" }}>
-                  <div style={{ fontWeight: 800, color: COLORS.dark, fontSize: 15, marginBottom: 12 }}>👥 Players ({selectedHistory.players.length})</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {selectedHistory.players.map(p => (
-                      <span key={p.id} style={{ background: COLORS.greenLight, color: COLORS.dark, borderRadius: 20, padding: "4px 14px", fontSize: 13, fontWeight: 600 }}>{p.name}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                  <div style={{ fontWeight: 800, color: COLORS.dark, fontSize: 17 }}>📚 Tournament History</div>
-                  <Badge color={COLORS.purple}>{history.length} saved</Badge>
-                </div>
-                {history.length === 0 ? (
-                  <div style={{ background: "#fff", borderRadius: 12, padding: 40, textAlign: "center", color: "#aaa", boxShadow: "0 2px 8px #0001" }}>
-                    No tournaments saved yet.<br /><span style={{ fontSize: 13 }}>End a tournament to save it here.</span>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {history.map(t => (
-                      <div key={t.id} style={{ background: "#fff", borderRadius: 12, padding: 18, boxShadow: "0 2px 8px #0001", borderLeft: `5px solid ${COLORS.purple}` }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                          <div>
-                            <div style={{ fontWeight: 800, color: COLORS.dark, fontSize: 15 }}>📅 {t.date}</div>
-                            <div style={{ color: "#888", fontSize: 13, marginTop: 2 }}>{t.players.length} players · {t.rounds.length} rounds</div>
-                          </div>
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <Button small outline color={COLORS.green} onClick={() => setSelectedHistory(t)}>View</Button>
-                            <Button small outline color={COLORS.red} onClick={() => deleteHistory(t.id)}>Delete</Button>
-                          </div>
-                        </div>
-                        {t.leaderboard.slice(0, 3).map((p, i) => (
-                          <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginTop: 4 }}>
-                            <span>{i===0?"🥇":i===1?"🥈":"🥉"}</span>
-                            <span style={{ fontWeight: 700, color: COLORS.dark }}>{p.name}</span>
-                            <span style={{ color: "#888" }}>{p.wins}W · {p.points}pts</span>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+        </div>
 
       </div>
     </div>
-  );
-}
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-logo">GoGreenVue</div>
+    <div class="footer-tagline">Make Dreams Possible</div>
+    <div class="footer-divider"></div>
+    <div class="footer-copy">© 2026 GoGreenVue · gogreenvue.com</div>
+  </footer>
+
+  <script>
+    // Navbar scroll effect
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 60);
+    });
+  </script>
+</body>
+</html>
