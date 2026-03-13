@@ -1,26 +1,20 @@
 name: Deploy to GitHub Pages
-
 on:
   push:
     branches: [main]
-
 permissions:
   contents: write
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 20
-
       - name: Install dependencies
         run: npm install
-
       # ── V3 (latest) ──────────────────────────────────────────
       - name: Build V3
         run: |
@@ -29,7 +23,6 @@ jobs:
           npx vite build
           mkdir -p deploy/pickleball-v3
           cp -r dist/. deploy/pickleball-v3/
-
       # ── V2 ───────────────────────────────────────────────────
       - name: Build V2
         run: |
@@ -38,7 +31,6 @@ jobs:
           npx vite build
           mkdir -p deploy/pickleball-v2
           cp -r dist/. deploy/pickleball-v2/
-
       # ── V1 ───────────────────────────────────────────────────
       - name: Build V1
         run: |
@@ -47,11 +39,14 @@ jobs:
           npx vite build
           mkdir -p deploy/pickleball
           cp -r dist/. deploy/pickleball/
-
+      # ── SONIQ Audio Enhancer ──────────────────────────────────
+      - name: Copy SONIQ app
+        run: |
+          mkdir -p deploy/soniq
+          cp soniq/index.html deploy/soniq/index.html
       # ── Homepage ─────────────────────────────────────────────
       - name: Copy homepage
         run: cp homepage.html deploy/index.html
-
       # ── Publish ──────────────────────────────────────────────
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
